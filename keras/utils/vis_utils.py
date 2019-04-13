@@ -8,7 +8,12 @@ import os
 # `pydot` is an optional dependency,
 # see `extras_require` in `setup.py`.
 try:
+<<<<<<< HEAD
     import pydot
+=======
+    #import pydot
+	import pydot_ng as pydot
+>>>>>>> 989a0ee14332fa85e70c5d162e2c64568d36f264
 except ImportError:
     pydot = None
 
@@ -38,6 +43,10 @@ def model_to_dot(model,
                  expand_nested=False,
                  dpi=96,
                  subgraph=False):
+<<<<<<< HEAD
+=======
+				 #subgraph=True):
+>>>>>>> 989a0ee14332fa85e70c5d162e2c64568d36f264
     """Convert a Keras model to dot format.
     # Arguments
         model: A Keras model instance.
