@@ -39,7 +39,6 @@ def model_to_dot(model,
                  expand_nested=False,
                  dpi=96,
                  subgraph=False):
-                 #subgraph=True):
     """Convert a Keras model to dot format.
     # Arguments
         model: A Keras model instance.
