@@ -10,7 +10,6 @@ import os
 try:
     #import pydot
 	import pydot_ng as pydot
-	#import pydotplus as pydot
 except ImportError:
     pydot = None
 
@@ -36,9 +35,12 @@ def _check_pydot():
 def model_to_dot(model,
                  show_shapes=False,
                  show_layer_names=True,
-                 rankdir='TB'):
+                 rankdir='TB',
+                 expand_nested=False,
+                 dpi=96,
+                 subgraph=False):
+				 #subgraph=True):
     """Convert a Keras model to dot format.
-
     # Arguments
         model: A Keras model instance.
         show_shapes: whether to display shape information.
@@ -47,35 +49,88 @@ def model_to_dot(model,
             a string specifying the format of the plot:
             'TB' creates a vertical plot;
             'LR' creates a horizontal plot.
-
+        expand_nested: whether to expand nested models into clusters.
+        dpi: dot DPI.
+        subgraph: whether to return a pydot.Cluster instance.
     # Returns
-        A `pydot.Dot` instance representing the Keras model.
+        A `pydot.Dot` instance representing the Keras model or
+        a `pydot.Cluster` instance representing nested model if
+        `subgraph=True`.
     """
     from ..layers.wrappers import Wrapper
+    from ..models import Model
     from ..models import Sequential
 
     _check_pydot()
-    dot = pydot.Dot()
-    dot.set('rankdir', rankdir)
-    dot.set('concentrate', True)
-    dot.set_node_defaults(shape='record')
+    if subgraph:
+        dot = pydot.Cluster(style='dashed', graph_name=model.name)
+        dot.set('label', model.name)
+        dot.set('labeljust', 'l')
+    else:
+        dot = pydot.Dot()
+        dot.set('rankdir', rankdir)
+        dot.set('concentrate', True)
+        dot.set('dpi', dpi)
+        dot.set_node_defaults(shape='record')
 
     if isinstance(model, Sequential):
         if not model.built:
             model.build()
-    layers = model.layers
+    layers = model._layers
 
     # Create graph nodes.
-    for layer in layers:
+    for i, layer in enumerate(layers):
         layer_id = str(id(layer))
 
         # Append a wrapped layer's label to node's label, if it exists.
         layer_name = layer.name
         class_name = layer.__class__.__name__
+        # ccg modify - original start
+        '''
         if isinstance(layer, Wrapper):
-            layer_name = '{}({})'.format(layer_name, layer.layer.name)
-            child_class_name = layer.layer.__class__.__name__
-            class_name = '{}({})'.format(class_name, child_class_name)
+            if expand_nested and isinstance(layer.layer, Model):
+                submodel = model_to_dot(layer.layer, show_shapes,
+                                        show_layer_names, rankdir, expand_nested,
+                                        subgraph=True)
+                model_nodes = submodel.get_nodes()
+                dot.add_edge(pydot.Edge(layer_id, model_nodes[0].get_name()))
+                if len(layers) > i + 1:
+                    next_layer_id = str(id(layers[i + 1]))
+                    dot.add_edge(pydot.Edge(
+                        model_nodes[len(model_nodes) - 1].get_name(),
+                        next_layer_id))
+                dot.add_subgraph(submodel)
+            else:
+                layer_name = '{}({})'.format(layer_name, layer.layer.name)
+                child_class_name = layer.layer.__class__.__name__
+                class_name = '{}({})'.format(class_name, child_class_name)
+        '''
+        # ccg modify - original end
+
+        # ccg modify - new start
+        if isinstance(layer, Wrapper):
+            if expand_nested and isinstance(layer.layer, Model):
+                submodel_wrapper = model_to_dot(layer.layer, show_shapes,
+                                        show_layer_names, rankdir, expand_nested,
+                                        subgraph=True)
+                submodel_wrapper_model_nodes = submodel_wrapper.get_nodes()
+                submodel_wrapper_first_node = submodel_wrapper_model_nodes[0]
+                submodel_wrapper_last_node = submodel_wrapper_model_nodes[len(submodel_wrapper_model_nodes) - 1]
+                dot.add_subgraph(submodel_wrapper)
+            else:
+                layer_name = '{}({})'.format(layer_name, layer.layer.name)
+                child_class_name = layer.layer.__class__.__name__
+                class_name = '{}({})'.format(class_name, child_class_name)
+            
+        if expand_nested and isinstance(layer, Model):
+            submodel_not_wrapper = model_to_dot(layer, show_shapes,
+                                    show_layer_names, rankdir, expand_nested,
+                                    subgraph=True)
+            submodel_not_wrapper_model_nodes = submodel_not_wrapper.get_nodes()
+            submodel_not_wrapper_first_node = submodel_not_wrapper_model_nodes[0]
+            submodel_not_wrapper_last_node = submodel_not_wrapper_model_nodes[len(submodel_not_wrapper_model_nodes) - 1] # modify
+            dot.add_subgraph(submodel_not_wrapper)
+        # ccg modify - new end        
 
         # Create node's label.
         if show_layer_names:
@@ -99,8 +154,13 @@ def model_to_dot(model,
             label = '%s\n|{input:|output:}|{{%s}|{%s}}' % (label,
                                                            inputlabels,
                                                            outputlabels)
+        '''  modify
         node = pydot.Node(layer_id, label=label)
         dot.add_node(node)
+        '''
+        if not expand_nested or not isinstance(layer, Model):
+            node = pydot.Node(layer_id, label=label)
+            dot.add_node(node)
 
     # Connect nodes with edges.
     for layer in layers:
@@ -109,8 +169,44 @@ def model_to_dot(model,
             node_key = layer.name + '_ib-' + str(i)
             if node_key in model._network_nodes:
                 for inbound_layer in node.inbound_layers:
+                    '''
+                    if not expand_nested or not (
+                            isinstance(inbound_layer, Wrapper) and
+                            isinstance(inbound_layer.layer, Model)):
+                        inbound_layer_id = str(id(inbound_layer))
+                        # Make sure that both nodes exist before connecting them with
+                        # an edge, as add_edge would otherwise
+                        # create any missing node.
+                        assert dot.get_node(inbound_layer_id)
+                        assert dot.get_node(layer_id)
+                        dot.add_edge(pydot.Edge(inbound_layer_id, layer_id))
+                    '''
                     inbound_layer_id = str(id(inbound_layer))
-                    dot.add_edge(pydot.Edge(inbound_layer_id, layer_id))
+                                        
+                    if (not (expand_nested and isinstance(inbound_layer, Model))) and (
+                        not (expand_nested and isinstance(inbound_layer, Wrapper) and isinstance(inbound_layer.layer, Model))):
+                        
+                        if (not (expand_nested and isinstance(layer, Model))) and (
+                            not (expand_nested and isinstance(layer, Wrapper) and isinstance(layer.layer, Model))):
+                            assert dot.get_node(inbound_layer_id)
+                            assert dot.get_node(layer_id)
+                            dot.add_edge(pydot.Edge(inbound_layer_id, layer_id))
+                            
+                        elif expand_nested and isinstance(layer, Model):
+                            if not dot.get_edge(inbound_layer_id, submodel_not_wrapper_first_node.get_name()):
+                                dot.add_edge(pydot.Edge(inbound_layer_id, submodel_not_wrapper_first_node.get_name()))
+                          
+                        elif expand_nested and isinstance(layer, Wrapper) and isinstance(layer.layer, Model):
+                            dot.add_edge(pydot.Edge(inbound_layer_id, layer_id))
+                            dot.add_edge(pydot.Edge(layer_id, submodel_wrapper_first_node.get_name()))
+
+                    elif expand_nested and isinstance(inbound_layer, Model):
+                        if not dot.get_edge(submodel_not_wrapper_last_node.get_name(), layer_id):
+                            dot.add_edge(pydot.Edge(submodel_not_wrapper_last_node.get_name(), layer_id))
+                        
+                    elif expand_nested and isinstance(inbound_layer, Wrapper) and isinstance(inbound_layer.layer, Model):
+                        if not dot.get_edge(submodel_wrapper_last_node.get_name(), layer_id):
+                            dot.add_edge(pydot.Edge(submodel_wrapper_last_node.get_name(), layer_id))
     return dot
 
 
@@ -118,9 +214,10 @@ def plot_model(model,
                to_file='model.png',
                show_shapes=False,
                show_layer_names=True,
-               rankdir='TB'):
+               rankdir='TB',
+               expand_nested=False,
+               dpi=96):
     """Converts a Keras model to dot format and save to a file.
-
     # Arguments
         model: A Keras model instance
         to_file: File name of the plot image.
@@ -130,11 +227,23 @@ def plot_model(model,
             a string specifying the format of the plot:
             'TB' creates a vertical plot;
             'LR' creates a horizontal plot.
+        expand_nested: whether to expand nested models into clusters.
+        dpi: dot DPI.
+    # Returns
+        A Jupyter notebook Image object if Jupyter is installed.
+        This enables in-line display of the model plots in notebooks.
     """
-    dot = model_to_dot(model, show_shapes, show_layer_names, rankdir)
+    dot = model_to_dot(model, show_shapes, show_layer_names, rankdir,
+                       expand_nested, dpi)
     _, extension = os.path.splitext(to_file)
     if not extension:
         extension = 'png'
     else:
         extension = extension[1:]
     dot.write(to_file, format=extension)
+    # Return the image as a Jupyter Image object, to be displayed in-line.
+    try:
+        from IPython import display
+        return display.Image(filename=to_file)
+    except ImportError:
+        pass
