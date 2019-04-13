@@ -1,0 +1,1 @@
+test the influence of adding a unrelevant file when merging. 

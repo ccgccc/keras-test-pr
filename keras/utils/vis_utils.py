@@ -8,7 +8,12 @@ import os
 # `pydot` is an optional dependency,
 # see `extras_require` in `setup.py`.
 try:
+<<<<<<< HEAD
     import pydot
+=======
+    #import pydot
+	import pydot_ng as pydot
+>>>>>>> change_plot_model
 except ImportError:
     pydot = None
 
@@ -38,6 +43,10 @@ def model_to_dot(model,
                  expand_nested=False,
                  dpi=96,
                  subgraph=False):
+<<<<<<< HEAD
+=======
+				 #subgraph=True):
+>>>>>>> change_plot_model
     """Convert a Keras model to dot format.
     # Arguments
         model: A Keras model instance.
@@ -61,7 +70,11 @@ def model_to_dot(model,
 
     _check_pydot()
     if subgraph:
+<<<<<<< HEAD
         dot = pydot.Cluster(style='dashed')
+=======
+        dot = pydot.Cluster(style='dashed', graph_name=model.name)
+>>>>>>> change_plot_model
         dot.set('label', model.name)
         dot.set('labeljust', 'l')
     else:
@@ -83,6 +96,8 @@ def model_to_dot(model,
         # Append a wrapped layer's label to node's label, if it exists.
         layer_name = layer.name
         class_name = layer.__class__.__name__
+        # ccg modify - original start
+        '''
         if isinstance(layer, Wrapper):
             if expand_nested and isinstance(layer.layer, Model):
                 submodel = model_to_dot(layer.layer, show_shapes,
@@ -100,6 +115,36 @@ def model_to_dot(model,
                 layer_name = '{}({})'.format(layer_name, layer.layer.name)
                 child_class_name = layer.layer.__class__.__name__
                 class_name = '{}({})'.format(class_name, child_class_name)
+<<<<<<< HEAD
+=======
+        '''
+        # ccg modify - original end
+
+        # ccg modify - new start
+        if isinstance(layer, Wrapper):
+            if expand_nested and isinstance(layer.layer, Model):
+                submodel_wrapper = model_to_dot(layer.layer, show_shapes,
+                                        show_layer_names, rankdir, expand_nested,
+                                        subgraph=True)
+                submodel_wrapper_model_nodes = submodel_wrapper.get_nodes()
+                submodel_wrapper_first_node = submodel_wrapper_model_nodes[0]
+                submodel_wrapper_last_node = submodel_wrapper_model_nodes[len(submodel_wrapper_model_nodes) - 1]
+                dot.add_subgraph(submodel_wrapper)
+            else:
+                layer_name = '{}({})'.format(layer_name, layer.layer.name)
+                child_class_name = layer.layer.__class__.__name__
+                class_name = '{}({})'.format(class_name, child_class_name)
+            
+        if expand_nested and isinstance(layer, Model):
+            submodel_not_wrapper = model_to_dot(layer, show_shapes,
+                                    show_layer_names, rankdir, expand_nested,
+                                    subgraph=True)
+            submodel_not_wrapper_model_nodes = submodel_not_wrapper.get_nodes()
+            submodel_not_wrapper_first_node = submodel_not_wrapper_model_nodes[0]
+            submodel_not_wrapper_last_node = submodel_not_wrapper_model_nodes[len(submodel_not_wrapper_model_nodes) - 1] # modify
+            dot.add_subgraph(submodel_not_wrapper)
+        # ccg modify - new end        
+>>>>>>> change_plot_model
 
         # Create node's label.
         if show_layer_names:
@@ -123,8 +168,13 @@ def model_to_dot(model,
             label = '%s\n|{input:|output:}|{{%s}|{%s}}' % (label,
                                                            inputlabels,
                                                            outputlabels)
+        '''  modify
         node = pydot.Node(layer_id, label=label)
         dot.add_node(node)
+        '''
+        if not expand_nested or not isinstance(layer, Model):
+            node = pydot.Node(layer_id, label=label)
+            dot.add_node(node)
 
     # Connect nodes with edges.
     for layer in layers:
@@ -133,6 +183,10 @@ def model_to_dot(model,
             node_key = layer.name + '_ib-' + str(i)
             if node_key in model._network_nodes:
                 for inbound_layer in node.inbound_layers:
+<<<<<<< HEAD
+=======
+                    '''
+>>>>>>> change_plot_model
                     if not expand_nested or not (
                             isinstance(inbound_layer, Wrapper) and
                             isinstance(inbound_layer.layer, Model)):
@@ -143,6 +197,36 @@ def model_to_dot(model,
                         assert dot.get_node(inbound_layer_id)
                         assert dot.get_node(layer_id)
                         dot.add_edge(pydot.Edge(inbound_layer_id, layer_id))
+<<<<<<< HEAD
+=======
+                    '''
+                    inbound_layer_id = str(id(inbound_layer))
+                                        
+                    if (not (expand_nested and isinstance(inbound_layer, Model))) and (
+                        not (expand_nested and isinstance(inbound_layer, Wrapper) and isinstance(inbound_layer.layer, Model))):
+                        
+                        if (not (expand_nested and isinstance(layer, Model))) and (
+                            not (expand_nested and isinstance(layer, Wrapper) and isinstance(layer.layer, Model))):
+                            assert dot.get_node(inbound_layer_id)
+                            assert dot.get_node(layer_id)
+                            dot.add_edge(pydot.Edge(inbound_layer_id, layer_id))
+                            
+                        elif expand_nested and isinstance(layer, Model):
+                            if not dot.get_edge(inbound_layer_id, submodel_not_wrapper_first_node.get_name()):
+                                dot.add_edge(pydot.Edge(inbound_layer_id, submodel_not_wrapper_first_node.get_name()))
+                          
+                        elif expand_nested and isinstance(layer, Wrapper) and isinstance(layer.layer, Model):
+                            dot.add_edge(pydot.Edge(inbound_layer_id, layer_id))
+                            dot.add_edge(pydot.Edge(layer_id, submodel_wrapper_first_node.get_name()))
+
+                    elif expand_nested and isinstance(inbound_layer, Model):
+                        if not dot.get_edge(submodel_not_wrapper_last_node.get_name(), layer_id):
+                            dot.add_edge(pydot.Edge(submodel_not_wrapper_last_node.get_name(), layer_id))
+                        
+                    elif expand_nested and isinstance(inbound_layer, Wrapper) and isinstance(inbound_layer.layer, Model):
+                        if not dot.get_edge(submodel_wrapper_last_node.get_name(), layer_id):
+                            dot.add_edge(pydot.Edge(submodel_wrapper_last_node.get_name(), layer_id))
+>>>>>>> change_plot_model
     return dot
 
 
@@ -182,4 +266,8 @@ def plot_model(model,
         from IPython import display
         return display.Image(filename=to_file)
     except ImportError:
+<<<<<<< HEAD
         pass
+=======
+        pass
+>>>>>>> change_plot_model
