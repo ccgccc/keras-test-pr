@@ -8,8 +8,7 @@ import os
 # `pydot` is an optional dependency,
 # see `extras_require` in `setup.py`.
 try:
-    #import pydot
-    import pydot_ng as pydot
+    import pydot
 except ImportError:
     pydot = None
 
@@ -62,7 +61,7 @@ def model_to_dot(model,
 
     _check_pydot()
     if subgraph:
-        dot = pydot.Cluster(style='dashed', graph_name=model.name)
+        dot = pydot.Cluster(style = 'dashed', graph_name = model.name)
         dot.set('label', model.name)
         dot.set('labeljust', 'l')
     else:
@@ -88,11 +87,12 @@ def model_to_dot(model,
         if isinstance(layer, Wrapper):
             if expand_nested and isinstance(layer.layer, Model):
                 submodel_wrapper = model_to_dot(layer.layer, show_shapes,
-                                        show_layer_names, rankdir, expand_nested,
-                                        subgraph=True)
-                submodel_wrapper_model_nodes = submodel_wrapper.get_nodes()
-                submodel_wrapper_first_node = submodel_wrapper_model_nodes[0]
-                submodel_wrapper_last_node = submodel_wrapper_model_nodes[len(submodel_wrapper_model_nodes) - 1]
+                                    show_layer_names, rankdir, expand_nested,
+                                    subgraph=True)
+                # sub_w : submodel_wrapper
+                sub_w_nodes = submodel_wrapper.get_nodes()
+                sub_w_first_node = sub_w_nodes[0]
+                sub_w_last_node = sub_w_nodes[len(sub_w_nodes) - 1]
                 dot.add_subgraph(submodel_wrapper)
             else:
                 layer_name = '{}({})'.format(layer_name, layer.layer.name)
@@ -103,9 +103,10 @@ def model_to_dot(model,
             submodel_not_wrapper = model_to_dot(layer, show_shapes,
                                     show_layer_names, rankdir, expand_nested,
                                     subgraph=True)
-            submodel_not_wrapper_model_nodes = submodel_not_wrapper.get_nodes()
-            submodel_not_wrapper_first_node = submodel_not_wrapper_model_nodes[0]
-            submodel_not_wrapper_last_node = submodel_not_wrapper_model_nodes[len(submodel_not_wrapper_model_nodes) - 1] # modify
+            # sub_n : submodel_not_wrapper
+            sub_n_nodes = submodel_not_wrapper.get_nodes()
+            sub_n_first_node = sub_n_nodes[0]
+            sub_n_last_node = sub_n_nodes[len(sub_n_nodes) - 1]
             dot.add_subgraph(submodel_not_wrapper)     
 
         # Create node's label.
@@ -130,10 +131,7 @@ def model_to_dot(model,
             label = '%s\n|{input:|output:}|{{%s}|{%s}}' % (label,
                                                            inputlabels,
                                                            outputlabels)
-        '''  modify
-        node = pydot.Node(layer_id, label=label)
-        dot.add_node(node)
-        '''
+                                                           
         if not expand_nested or not isinstance(layer, Model):
             node = pydot.Node(layer_id, label=label)
             dot.add_node(node)
@@ -145,26 +143,48 @@ def model_to_dot(model,
             node_key = layer.name + '_ib-' + str(i)
             if node_key in model._network_nodes:
                 for inbound_layer in node.inbound_layers:
-                    inbound_layer_id = str(id(inbound_layer))                                  
-                    if (not (expand_nested and isinstance(inbound_layer, Model))) and (
-                        not (expand_nested and isinstance(inbound_layer, Wrapper) and isinstance(inbound_layer.layer, Model))):
-                        if (not (expand_nested and isinstance(layer, Model))) and (
-                            not (expand_nested and isinstance(layer, Wrapper) and isinstance(layer.layer, Model))):
+                    inbound_layer_id = str(id(inbound_layer))
+
+                    if (not (expand_nested and (
+                            isinstance(inbound_layer, Model))) 
+                            ) and (
+                            not (expand_nested and (
+                            isinstance(inbound_layer, Wrapper)) and (
+                            isinstance(inbound_layer.layer, Model))) ):
+
+                        if (not (expand_nested and (
+                                isinstance(layer, Model))) 
+                                ) and (
+                                not (expand_nested and 
+                                (isinstance(layer, Wrapper)) and (
+                                isinstance(layer.layer, Model))) ):
+
                             assert dot.get_node(inbound_layer_id)
                             assert dot.get_node(layer_id)
                             dot.add_edge(pydot.Edge(inbound_layer_id, layer_id))
+
                         elif expand_nested and isinstance(layer, Model):
-                            if not dot.get_edge(inbound_layer_id, submodel_not_wrapper_first_node.get_name()):
-                                dot.add_edge(pydot.Edge(inbound_layer_id, submodel_not_wrapper_first_node.get_name()))
-                        elif expand_nested and isinstance(layer, Wrapper) and isinstance(layer.layer, Model):
+                            if not dot.get_edge(inbound_layer_id, 
+                                                sub_n_first_node.get_name()):
+                                dot.add_edge(pydot.Edge(inbound_layer_id, 
+                                                sub_n_first_node.get_name()))
+
+                        elif expand_nested and isinstance(layer, Wrapper) and (
+                                isinstance(layer.layer, Model)):
                             dot.add_edge(pydot.Edge(inbound_layer_id, layer_id))
-                            dot.add_edge(pydot.Edge(layer_id, submodel_wrapper_first_node.get_name()))
+                            dot.add_edge(pydot.Edge(layer_id, 
+                                                sub_w_first_node.get_name()))
+
                     elif expand_nested and isinstance(inbound_layer, Model):
-                        if not dot.get_edge(submodel_not_wrapper_last_node.get_name(), layer_id):
-                            dot.add_edge(pydot.Edge(submodel_not_wrapper_last_node.get_name(), layer_id))
-                    elif expand_nested and isinstance(inbound_layer, Wrapper) and isinstance(inbound_layer.layer, Model):
-                        if not dot.get_edge(submodel_wrapper_last_node.get_name(), layer_id):
-                            dot.add_edge(pydot.Edge(submodel_wrapper_last_node.get_name(), layer_id))
+                        if not dot.get_edge(sub_n_last_node.get_name(), layer_id):
+                            dot.add_edge(pydot.Edge(sub_n_last_node.get_name(), 
+                                                        layer_id))
+
+                    elif expand_nested and isinstance(inbound_layer, Wrapper) and (
+                                isinstance(inbound_layer.layer, Model)):
+                        if not dot.get_edge(sub_w_last_node.get_name(), layer_id):
+                            dot.add_edge(pydot.Edge(sub_w_last_node.get_name(), 
+                                                        layer_id))
     return dot
 
 
